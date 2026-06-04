@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crypto Signal Scanner</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #080c14;
+    font-family: 'Courier New', monospace;
+    color: #e0e0e0;
+    padding: 16px;
+    max-width: 480px;
+    margin: 0 auto;
+    min-height: 100vh;
+  }
+  .header { text-align: center; margin-bottom: 20px; }
+  .header-sub { font-size: 11px; letter-spacing: 6px; color: #00ffcc; margin-bottom: 4px; }
+  .header-title { font-size: 26px; font-weight: 900; letter-spacing: 3px; color: #fff; }
+  .header-desc { font-size: 11px; color: #555; margin-top: 2px; }
+
+  .filter-box {
+    background: #0d1520;
+    border: 1px solid #1a2a3a;
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 14px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .filter-label { font-size: 10px; color: #00ffcc; margin-bottom: 4px; }
+  input[type=number], input[type=text] {
+    width: 100%;
+    background: #111c2a;
+    border: 1px solid #1e3048;
+    color: #fff;
+    padding: 6px 8px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-family: 'Courier New', monospace;
+  }
+
+  .scan-btn {
+    width: 100%;
+    padding: 14px;
+    background: #00ffcc;
+    color: #000;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 900;
+    letter-spacing: 3px;
+    cursor: pointer;
+    margin-bottom: 16px;
+    font-family: 'Courier New', monospace;
+    transition: background 0.2s;
+  }
+  .scan-btn.scanning { background: #009977; }
+
+  .stats { display: flex; gap: 10px; margin-bottom: 16px; }
+  .stat {
+    flex: 1;
+    border-radius: 8px;
+    padding: 10px;
+    text-align: center;
+  }
+  .stat.good { background: #0a1f0f; border: 1px solid #00ff6620; }
+  .stat.bad { background: #1a0a0a; border: 1px solid #ff003320; }
+  .stat.total { background: #0d1520; border: 1px solid #1a2a3a; }
+  .stat-num { font-size: 24px; font-weight: 900; }
+  .stat.good .stat-num { color: #00ff88; }
+  .stat.bad .stat-num { color: #ff4455; }
+  .stat.total .stat-num { color: #aaa; }
+  .stat-label { font-size: 10px; }
+  .stat.good .stat-label { color: #00ff8880; }
+  .stat.bad .stat-label { color: #ff445580; }
+  .stat.total .stat-label { color: #555; }
+
+  .toggle { display: flex; gap: 8px; margin-bottom: 14px; }
+  .toggle-btn {
+    flex: 1; padding: 8px; border-radius: 7px; border: none; cursor: pointer;
+    font-weight: 700; font-size: 12px; letter-spacing: 1px;
+    font-family: 'Courier New', monospace;
+    background: #111c2a; color: #555;
+    transition: all 0.2s;
+  }
+  .toggle-btn.active { background: #00ffcc; color: #000; }
+
+  .signal-card {
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 12px;
+    position: relative;
+  }
+  .signal-card.ok { background: #0a1a0f; border: 1px solid #00ff4430; border-left: 3px solid #00ff88; }
+  .signal-card.fail { background: #130a0a; border: 1px solid #ff003320; border-left: 3px solid #ff3344; }
+
+  .card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .card-left { display: flex; align-items: center; gap: 10px; }
+  .pair-name { font-size: 20px; font-weight: 900; color: #fff; }
+  .direction-badge {
+    padding: 3px 10px; border-radius: 5px; font-size: 11px;
+    font-weight: 900; letter-spacing: 2px;
+  }
+  .direction-badge.long { background: #00aa4420; color: #00ff88; border: 1px solid #00ff4430; }
+  .direction-badge.short { background: #aa000020; color: #ff4455; border: 1px solid #ff334430; }
+  .status-icon { font-size: 20px; font-weight: 900; }
+
+  .tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .tag {
+    padding: 2px 8px; border-radius: 4px; font-size: 10px;
+  }
+  .tag.vol-ok { background: #004433; color: #00ffaa; border: 1px solid #00ffaa30; }
+  .tag.vol-bad { background: #330011; color: #ff4455; border: 1px solid #ff445530; }
+  .tag.rsi { background: #001a2a; color: #4499ff; border: 1px solid #4499ff30; }
+  .tag.conf-ok { background: #004433; color: #00ffaa; border: 1px solid #00ffaa30; }
+  .tag.conf-bad { background: #330011; color: #ff4455; border: 1px solid #ff445530; }
+
+  .tp-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-bottom: 10px; }
+  .tp-cell { background: #0d1520; border-radius: 6px; padding: 6px 8px; text-align: center; }
+  .tp-label { font-size: 9px; color: #555; margin-bottom: 2px; }
+  .tp-val { font-size: 11px; font-weight: 700; }
+  .tp-cell.sl .tp-val { color: #ff4455; }
+  .tp-cell.tp1 .tp-val { color: #00ff88; }
+  .tp-cell.tp2 .tp-val { color: #00ccff; }
+
+  .reasons { font-size: 10px; line-height: 1.8; }
+  .reason-ok { color: #00aa66; }
+  .reason-fail { color: #aa3344; }
+
+  .remove-btn {
+    position: absolute; top: 10px; right: 10px;
+    background: none; border: none; color: #333; cursor: pointer; font-size: 16px;
+  }
+
+  .empty { text-align: center; padding: 40px; color: #444; }
+  .empty-icon { font-size: 32px; margin-bottom: 8px; }
+  .empty-sub { font-size: 12px; margin-top: 4px; color: #333; }
+
+  .add-btn {
+    width: 100%; padding: 12px;
+    background: #0d1520; border: 1px dashed #1e3048;
+    color: #4499ff; border-radius: 10px; cursor: pointer;
+    font-size: 13px; font-weight: 700;
+    font-family: 'Courier New', monospace;
+    margin-top: 16px;
+  }
+
+  .add-form {
+    background: #0d1520; border: 1px solid #1e3048;
+    border-radius: 10px; padding: 14px; margin-top: 16px;
+  }
+  .add-form-title { font-size: 12px; color: #00ffcc; margin-bottom: 12px; letter-spacing: 2px; }
+  .add-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .add-field { margin-bottom: 0; }
+  .add-label { font-size: 9px; color: #555; margin-bottom: 3px; }
+  .dir-row { display: flex; gap: 8px; margin-top: 10px; }
+  .dir-btn {
+    flex: 1; padding: 8px; border-radius: 6px; border: none; cursor: pointer;
+    font-weight: 900; font-size: 12px; font-family: 'Courier New', monospace;
+    background: #111c2a; color: #555;
+  }
+  .dir-btn.active-long { background: #00ff88; color: #000; }
+  .dir-btn.active-short { background: #ff4455; color: #000; }
+  .form-actions { display: flex; gap: 8px; margin-top: 12px; }
+  .form-add { flex: 1; padding: 10px; background: #00ffcc; color: #000; border: none; border-radius: 8px; font-weight: 900; cursor: pointer; font-family: 'Courier New', monospace; }
+  .form-cancel { flex: 1; padding: 10px; background: #1a0a0a; color: #ff4455; border: 1px solid #ff445530; border-radius: 8px; cursor: pointer; font-family: 'Courier New', monospace; }
+
+  .footer { text-align: center; margin-top: 20px; font-size: 10px; color: #222; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-sub">CRYPTO</div>
+  <div class="header-title">SIGNAL SCANNER</div>
+  <div class="header-desc">Solo señales que cumplen los filtros</div>
+</div>
+
+<div class="filter-box">
+  <div>
+    <div class="filter-label">VOL MÍNIMO ×</div>
+    <input type="number" id="minVol" value="2.0" step="0.1" onchange="render()">
+  </div>
+  <div>
+    <div class="filter-label">CONFIANZA MÍN %</div>
+    <input type="number" id="minConf" value="70" onchange="render()">
+  </div>
+</div>
+
+<button class="scan-btn" id="scanBtn" onclick="scan()">⚡ ESCANEAR</button>
+
+<div class="stats">
+  <div class="stat good"><div class="stat-num" id="countGood">0</div><div class="stat-label">VÁLIDAS</div></div>
+  <div class="stat bad"><div class="stat-num" id="countBad">0</div><div class="stat-label">DESCARTADAS</div></div>
+  <div class="stat total"><div class="stat-num" id="countTotal">0</div><div class="stat-label">TOTAL</div></div>
+</div>
+
+<div class="toggle">
+  <button class="toggle-btn active" id="btnValid" onclick="setView('valid')">✅ SOLO VÁLIDAS</button>
+  <button class="toggle-btn" id="btnAll" onclick="setView('all')">📋 TODAS</button>
+</div>
+
+<div id="signalList"></div>
+
+<button class="add-btn" id="addBtn" onclick="showForm()">+ AÑADIR SEÑAL MANUALMENTE</button>
+
+<div class="add-form" id="addForm" style="display:none">
+  <div class="add-form-title">NUEVA SEÑAL</div>
+  <div class="add-grid">
+    <div class="add-field"><div class="add-label">PAR (ej: BTC)</div><input type="text" id="f-pair" placeholder="BTC"></div>
+    <div class="add-field"><div class="add-label">PRECIO</div><input type="number" id="f-price" placeholder="0.00"></div>
+    <div class="add-field"><div class="add-label">VOL ×</div><input type="number" id="f-vol" step="0.01" placeholder="1.50"></div>
+    <div class="add-field"><div class="add-label">RSI</div><input type="number" id="f-rsi" placeholder="55"></div>
+    <div class="add-field"><div class="add-label">CONFIANZA %</div><input type="number" id="f-conf" placeholder="70"></div>
+    <div class="add-field"><div class="add-label">SL %</div><input type="number" id="f-sl" placeholder="-1.5"></div>
+    <div class="add-field"><div class="add-label">TP1 %</div><input type="number" id="f-tp1" placeholder="2.0"></div>
+    <div class="add-field"><div class="add-label">TP2 %</div><input type="number" id="f-tp2" placeholder="3.0"></div>
+  </div>
+  <div>
+    <div class="add-label" style="margin-top:10px">DIRECCIÓN</div>
+    <div class="dir-row">
+      <button class="dir-btn active-long" id="dir-long" onclick="setDir('LONG')">LONG</button>
+      <button class="dir-btn" id="dir-short" onclick="setDir('SHORT')">SHORT</button>
+    </div>
+  </div>
+  <div class="form-actions">
+    <button class="form-add" onclick="addSignal()">AÑADIR</button>
+    <button class="form-cancel" onclick="hideForm()">CANCELAR</button>
+  </div>
+</div>
+
+<div class="footer">No es asesoría financiera • Usa gestión de riesgo</div>
+
+<script>
+let signals = [
+  { id:1, pair:"FTM", direction:"SHORT", price:0.6994, volume:3.52, rsi:50.9, confidence:75, sl:-1.13, tp1:1.51, tp2:2.27 },
+  { id:2, pair:"DOT", direction:"LONG", price:1.118, volume:0.68, rsi:52.9, confidence:65, sl:-1.59, tp1:2.12, tp2:3.18 },
+  { id:3, pair:"NEAR", direction:"LONG", price:2.871, volume:0.57, rsi:56.6, confidence:60, sl:-1.5, tp1:2.0, tp2:3.0 },
+  { id:4, pair:"IMX", direction:"LONG", price:0.1554, volume:0.66, rsi:54.0, confidence:60, sl:-1.5, tp1:2.0, tp2:3.0 },
+  { id:5, pair:"TAO", direction:"LONG", price:228.5, volume:0.25, rsi:49.0, confidence:65, sl:-1.73, tp1:2.30, tp2:3.45 },
+  { id:6, pair:"GRT", direction:"LONG", price:0.02356, volume:0.08, rsi:51.3, confidence:55, sl:-1.53, tp1:2.04, tp2:3.06 },
+  { id:7, pair:"WIF", direction:"LONG", price:0.193, volume:1.98, rsi:58.6, confidence:68, sl:-1.4, tp1:1.9, tp2:2.8 },
+];
+
+let direction = "LONG";
+let viewMode = "valid";
+
+function getFilters() {
+  return {
+    minVol: parseFloat(document.getElementById('minVol').value) || 0,
+    minConf: parseInt(document.getElementById('minConf').value) || 0,
+  };
+}
+
+function analyze(sig, f) {
+  const passes = [], reasons = [];
+  const volOk = sig.volume >= f.minVol;
+  const confOk = sig.confidence >= f.minConf;
+  if (volOk) passes.push("✅ Volumen fuerte");
+  else reasons.push(`❌ Volumen bajo (×${sig.volume} < ×${f.minVol})`);
+  if (confOk) passes.push("✅ Confianza alta");
+  else reasons.push(`❌ Confianza baja (${sig.confidence}% < ${f.minConf}%)`);
+  if (sig.direction === "SHORT" && sig.rsi >= 55) passes.push("✅ RSI zona SHORT");
+  else if (sig.direction === "SHORT") reasons.push(`⚠️ RSI ${sig.rsi} no ideal para SHORT`);
+  if (sig.direction === "LONG" && sig.rsi <= 50) passes.push("✅ RSI zona LONG");
+  else if (sig.direction === "LONG") reasons.push(`⚠️ RSI ${sig.rsi} algo alto para LONG`);
+  return { ok: volOk && confOk, passes, reasons };
+}
+
+function render() {
+  const f = getFilters();
+  const analyzed = signals.map(s => ({ ...s, ...analyze(s, f) }));
+  const good = analyzed.filter(s => s.ok);
+  const bad = analyzed.filter(s => !s.ok);
+  document.getElementById('countGood').textContent = good.length;
+  document.getElementById('countBad').textContent = bad.length;
+  document.getElementById('countTotal').textContent = signals.length;
+
+  const list = viewMode === 'valid' ? good : analyzed;
+  const container = document.getElementById('signalList');
+
+  if (list.length === 0) {
+    container.innerHTML = `<div class="empty"><div class="empty-icon">🔍</div><div>No hay señales que pasen los filtros</div><div class="empty-sub">Ajusta los filtros o añade señales</div></div>`;
+    return;
+  }
+
+  container.innerHTML = list.map(sig => `
+    <div class="signal-card ${sig.ok ? 'ok' : 'fail'}">
+      <button class="remove-btn" onclick="removeSignal(${sig.id})">✕</button>
+      <div class="card-top">
+        <div class="card-left">
+          <span class="pair-name">${sig.pair}</span>
+          <span class="direction-badge ${sig.direction.toLowerCase()}">${sig.direction}</span>
+        </div>
+        <span class="status-icon">${sig.ok ? '✅' : '❌'}</span>
+      </div>
+      <div class="tags">
+        <span class="tag ${sig.volume >= f.minVol ? 'vol-ok' : 'vol-bad'}">VOL ×${sig.volume}</span>
+        <span class="tag rsi">RSI ${sig.rsi}</span>
+        <span class="tag ${sig.confidence >= f.minConf ? 'conf-ok' : 'conf-bad'}">${sig.confidence}% conf</span>
+      </div>
+      <div class="tp-row">
+        <div class="tp-cell sl"><div class="tp-label">SL</div><div class="tp-val">${sig.sl}%</div></div>
+        <div class="tp-cell tp1"><div class="tp-label">TP1</div><div class="tp-val">+${sig.tp1}%</div></div>
+        <div class="tp-cell tp2"><div class="tp-label">TP2</div><div class="tp-val">+${sig.tp2}%</div></div>
+      </div>
+      <div class="reasons">
+        ${sig.passes.map(p => `<div class="reason-ok">${p}</div>`).join('')}
+        ${sig.reasons.map(r => `<div class="reason-fail">${r}</div>`).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
+function scan() {
+  const btn = document.getElementById('scanBtn');
+  btn.textContent = '⚡ ESCANEANDO...';
+  btn.classList.add('scanning');
+  setTimeout(() => {
+    btn.textContent = '⚡ ESCANEAR';
+    btn.classList.remove('scanning');
+    render();
+  }, 1000);
+}
+
+function setView(mode) {
+  viewMode = mode;
+  document.getElementById('btnValid').classList.toggle('active', mode === 'valid');
+  document.getElementById('btnAll').classList.toggle('active', mode === 'all');
+  render();
+}
+
+function removeSignal(id) {
+  signals = signals.filter(s => s.id !== id);
+  render();
+}
+
+function setDir(d) {
+  direction = d;
+  document.getElementById('dir-long').className = 'dir-btn' + (d === 'LONG' ? ' active-long' : '');
+  document.getElementById('dir-short').className = 'dir-btn' + (d === 'SHORT' ? ' active-short' : '');
+}
+
+function showForm() {
+  document.getElementById('addForm').style.display = 'block';
+  document.getElementById('addBtn').style.display = 'none';
+}
+
+function hideForm() {
+  document.getElementById('addForm').style.display = 'none';
+  document.getElementById('addBtn').style.display = 'block';
+}
+
+function addSignal() {
+  const pair = document.getElementById('f-pair').value.trim().toUpperCase();
+  const volume = parseFloat(document.getElementById('f-vol').value);
+  const rsi = parseFloat(document.getElementById('f-rsi').value);
+  const confidence = parseInt(document.getElementById('f-conf').value);
+  if (!pair || !volume || !rsi || !confidence) return alert('Rellena al menos: par, volumen, RSI y confianza');
+  signals.push({
+    id: Date.now(),
+    pair,
+    direction,
+    price: parseFloat(document.getElementById('f-price').value) || 0,
+    volume,
+    rsi,
+    confidence,
+    sl: parseFloat(document.getElementById('f-sl').value) || -1.5,
+    tp1: parseFloat(document.getElementById('f-tp1').value) || 2.0,
+    tp2: parseFloat(document.getElementById('f-tp2').value) || 3.0,
+  });
+  ['f-pair','f-price','f-vol','f-rsi','f-conf','f-sl','f-tp1','f-tp2'].forEach(id => document.getElementById(id).value = '');
+  hideForm();
+  render();
+}
+
+render();
+</script>
+</body>
+</html>
